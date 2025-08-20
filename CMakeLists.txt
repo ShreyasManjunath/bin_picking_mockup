@@ -7,25 +7,36 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(rosidl_default_runtime REQUIRED)
 
-# Library with the class definition
-add_library(${PROJECT_NAME} SHARED
+set(srv_files
+  "srv/GetBarcode.srv"
+)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  ${srv_files}
+)
+
+add_library(${PROJECT_NAME}_lib SHARED
   src/barcode_publisher.cpp
 )
 
-target_include_directories(${PROJECT_NAME} PUBLIC
+target_include_directories(${PROJECT_NAME}_lib PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
 
-# This is the correct ament way to add deps
-ament_target_dependencies(${PROJECT_NAME}
+ament_target_dependencies(${PROJECT_NAME}_lib
   rclcpp
   std_msgs
   sensor_msgs
+  rosidl_default_runtime
 )
 
-# Node executable
+rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
+target_link_libraries(${PROJECT_NAME}_lib "${cpp_typesupport_target}")
+
 add_executable(${PROJECT_NAME}_node
   src/main.cpp
 )
@@ -36,13 +47,14 @@ target_include_directories(${PROJECT_NAME}_node PUBLIC
 )
 
 target_link_libraries(${PROJECT_NAME}_node
-  ${PROJECT_NAME}
+  ${PROJECT_NAME}_lib
 )
 
 ament_target_dependencies(${PROJECT_NAME}_node
   rclcpp
   std_msgs
   sensor_msgs
+  rosidl_default_runtime
 )
 
 install(DIRECTORY include/
@@ -50,11 +62,12 @@ install(DIRECTORY include/
 )
 
 install(TARGETS
-  ${PROJECT_NAME}
+  ${PROJECT_NAME}_lib
   ${PROJECT_NAME}_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
+ament_export_dependencies(rosidl_default_runtime)
 ament_package()
