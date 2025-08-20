@@ -1,0 +1,39 @@
+repos:
+-   repo: https://github.com/psf/black
+    rev: "24.4.2"
+    hooks:
+      - id: black
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+    - id: check-yaml
+      args: ["--unsafe"]
+    - id: end-of-file-fixer
+    - id: trailing-whitespace
+
+-   repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v18.1.6
+    hooks:
+    - id: clang-format
+      args: [--style=file]
+
+
+-   repo: https://github.com/cpplint/cpplint
+    rev: 1.6.1
+    hooks:
+    - id: cpplint
+      name: cpplint
+      description: Static code analysis of C/C++ files
+      language: python
+      args:
+        - '--linelength=120'
+        - '--quiet'
+        - '--filter=-runtime/references,-readability/todo,-readability/braces,-build/c++11,-whitespace/braces,-whitespace/newline,-whitespace/indent,-build/include_order,-whitespace/line_length'
+      files: \.(h\+\+|h|hh|hxx|hpp|cuh|c|cc|cpp|cu|c\+\+|cxx|tpp|txx)$
+      entry: cpplint
+- repo: https://github.com/compilerla/conventional-pre-commit
+  rev: "v3.2.0"
+  hooks:
+    - id: conventional-pre-commit
+      stages: [commit-msg]
+      args: [] # optional: list of Conventional Commits types to allow
