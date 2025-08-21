@@ -1,0 +1,7 @@
+int32 task_id
+---
+bool success
+string message
+int32 barcode
+---
+uint8 percent_complete
