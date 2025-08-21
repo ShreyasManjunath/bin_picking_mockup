@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 23)
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
@@ -15,15 +16,21 @@ set(srv_files
   "srv/SetEStopState.srv"
   "srv/SetDoorState.srv"
 )
+set(action_files
+  "action/FakeBinPick.action"
+)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${srv_files}
+  ${action_files}
 )
 
 add_library(${PROJECT_NAME}_lib SHARED
   src/barcode_publisher.cpp
   src/estop_handler.cpp
   src/door_handler.cpp
+  src/stack_light_handler.cpp
+  src/fake_bin_picking.cpp
 )
 
 target_include_directories(${PROJECT_NAME}_lib PUBLIC
@@ -33,8 +40,8 @@ target_include_directories(${PROJECT_NAME}_lib PUBLIC
 
 ament_target_dependencies(${PROJECT_NAME}_lib
   rclcpp
+  rclcpp_action
   std_msgs
-  sensor_msgs
   rosidl_default_runtime
 )
 
@@ -56,13 +63,20 @@ target_link_libraries(${PROJECT_NAME}_node
 
 ament_target_dependencies(${PROJECT_NAME}_node
   rclcpp
+  rclcpp_action
   std_msgs
-  sensor_msgs
   rosidl_default_runtime
 )
 
 install(DIRECTORY include/
   DESTINATION include
+)
+install(DIRECTORY srv
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY action
+  DESTINATION share/${PROJECT_NAME}
 )
 
 install(TARGETS
