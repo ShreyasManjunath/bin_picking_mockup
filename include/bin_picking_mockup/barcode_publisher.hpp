@@ -7,7 +7,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/service.hpp>
 #include <std_msgs/msg/int32.hpp>
-#include <vector>
 
 #include "bin_picking_mockup/srv/get_barcode.hpp"
 namespace bin_picking_mockup {
