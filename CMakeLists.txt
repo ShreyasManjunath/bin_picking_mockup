@@ -13,6 +13,7 @@ find_package(rosidl_default_runtime REQUIRED)
 set(srv_files
   "srv/GetBarcode.srv"
   "srv/SetEStopState.srv"
+  "srv/SetDoorState.srv"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -22,6 +23,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 add_library(${PROJECT_NAME}_lib SHARED
   src/barcode_publisher.cpp
   src/estop_handler.cpp
+  src/door_handler.cpp
 )
 
 target_include_directories(${PROJECT_NAME}_lib PUBLIC
