@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: write
+  issues: write
+  pull-requests: write
 
 jobs:
   release:
@@ -15,13 +17,17 @@ jobs:
       image: node:20-alpine
 
     steps:
+      - name: Install git and openssh
+        run: apk add --no-cache git openssh
+
       - name: Checkout (full history)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install git
-        run: apk add --no-cache git
+      - name: Mark workspace safe
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
 
       - name: Run semantic-release
         env:
