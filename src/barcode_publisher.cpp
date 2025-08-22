@@ -25,7 +25,7 @@ BarcodePublisher::BarcodePublisher()
 auto BarcodePublisher::publish_barcode() -> void {
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::uniform_int_distribution<> dist(100, 999);
+  std::uniform_int_distribution<> dist(10000, 99999);
   auto msg = std_msgs::msg::Int32();
   msg.data = dist(gen);
   barcode_pub_->publish(msg);
