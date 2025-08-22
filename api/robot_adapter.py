@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from threading import Thread
 from typing import Optional, Any, Dict
 
+import os
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -17,6 +18,7 @@ from bin_picking_mockup.srv import SetEStopState, SetDoorState
 from bin_picking_mockup.action import (
     FakeBinPick,
 )
+from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI(
@@ -24,6 +26,14 @@ app = FastAPI(
     description="REST API for E-Stop, Door, Stack Light, and Fake Bin Pick action.",
     version="1.0.0",
     swagger_ui_parameters={"defaultModelsExpandDepth": 0, "tryItOutEnabled": True},
+)
+ALLOW_ORIGINS = os.getenv("ALLOW_ORIGINS", "http://localhost:8082").split(",")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in ALLOW_ORIGINS if o.strip()],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
 )
 
 
@@ -47,6 +57,16 @@ class PickSyncResponse(BaseModel):
     pickSuccessful: bool
     errorMessage: Optional[str] = None
     itemBarcode: Optional[int] = None
+
+
+class EstopStateResponse(BaseModel):
+    pressed: Optional[bool]
+    message: Optional[str] = None
+
+
+class DoorStateResponse(BaseModel):
+    closed: Optional[bool]
+    message: Optional[str] = None
 
 
 class ApiNode(Node):
@@ -227,6 +247,34 @@ def get_stack_light():
     return {"state": int(state)}
 
 
+@app.get(
+    "/estop",
+    response_model=EstopStateResponse,
+    tags=["E-Stop"],
+    summary="Get current E-Stop state.",
+    description="Returns the latest `/estop_pressed` topic value (`std_msgs/Bool`).",
+)
+def get_estop_state():
+    pressed = app.state.ros_node.estop_pressed
+    if pressed is None:
+        return {"pressed": None, "message": "No data received yet from /estop_pressed"}
+    return {"pressed": bool(pressed)}
+
+
+@app.get(
+    "/door",
+    response_model=DoorStateResponse,
+    tags=["Door"],
+    summary="Get current door state.",
+    description="Returns the latest `/door_closed` topic value (`std_msgs/Bool`).",
+)
+def get_door_state():
+    closed = app.state.ros_node.door_closed
+    if closed is None:
+        return {"closed": None, "message": "No data received yet from /door_closed"}
+    return {"closed": bool(closed)}
+
+
 @app.post(
     "/confirmPick",
     response_model=PickSyncResponse,
@@ -248,7 +296,3 @@ def get_stack_light():
 )
 def start_fake_pick(req: PickRequest):
     return app.state.ros_node.run_pick_sync(req.pickId)
-
-
-if __name__ == "__main__":
-    uvicorn.run("robot_adapter:app", host="0.0.0.0", port=8081, reload=True)
