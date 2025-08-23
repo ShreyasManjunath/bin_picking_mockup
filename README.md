@@ -44,8 +44,7 @@ The API layer provides REST endpoints and ROS2 adapters for external system inte
 
 ### Prerequisites
 
-- [ROS2 Jazzy](https://docs.ros.org/en/jazzy/index.html) installed
-- A working ROS2 workspace (e.g., `ros2_ws`)
+- [ROS2 Jazzy](https://docs.ros.org/en/jazzy/index.html) or [ROS2 Humble](https://docs.ros.org/en/humble/index.html))installed
 - Python 3 and `virtualenv` for API environment
 
 ---
@@ -53,6 +52,7 @@ The API layer provides REST endpoints and ROS2 adapters for external system inte
 ### Option 1: Clone via GitHub
 
 ```bash
+mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws/src
 git clone https://github.com/ShreyasManjunath/bin_picking_mockup.git
 
@@ -60,7 +60,7 @@ git clone https://github.com/ShreyasManjunath/bin_picking_mockup.git
 
 - ### Option 2: Download ZIP file
 
-  ```
+  ```bash
   cd ~/ros2_ws/src
   unzip /path/to/bin_picking_mockup.zip -d .
   ```
@@ -69,7 +69,7 @@ git clone https://github.com/ShreyasManjunath/bin_picking_mockup.git
 
 - ### Build ROS2 Workspace
 
-  ```
+  ```bash
   source /opt/ros/jazzy/setup.bash
   cd ~/ros2_ws
   rosdep install --from-paths . --ignore-src -y --rosdistro jazzy
@@ -86,7 +86,7 @@ git clone https://github.com/ShreyasManjunath/bin_picking_mockup.git
 
 - ## API Environment Setup
 
-  ```
+  ```bash
   cd ~/ros2_ws/src/bin_picking_mockup
   virtualenv --python=python3.12 venv
   source venv/bin/activate
@@ -105,7 +105,7 @@ git clone https://github.com/ShreyasManjunath/bin_picking_mockup.git
 
 - ### 1. Source the ROS2 Workspace
 
-  ```
+  ```bash
   source ~/ros2_ws/install/setup.bash
   ```
 
@@ -119,7 +119,7 @@ git clone https://github.com/ShreyasManjunath/bin_picking_mockup.git
 
   Open a **new terminal**:
 
-  ```
+  ```bash
   source ~/ros2_ws/install/setup.bash
   ros2 launch bin_picking_mockup bin_picking_mockup.launch.py
   ```
@@ -132,7 +132,7 @@ git clone https://github.com/ShreyasManjunath/bin_picking_mockup.git
 
   Open another **new terminal**:
 
-  ```
+  ```bash
   cd ~/ros2_ws/src/bin_picking_mockup
   source venv/bin/activate
   source ~/ros2_ws/install/setup.bash
@@ -145,7 +145,7 @@ git clone https://github.com/ShreyasManjunath/bin_picking_mockup.git
 
   Open **another new terminal**:
 
-  ```
+  ```bash
   cd ~/ros2_ws/src/bin_picking_mockup
   source venv/bin/activate
   source ~/ros2_ws/install/setup.bash
@@ -168,18 +168,63 @@ git clone https://github.com/ShreyasManjunath/bin_picking_mockup.git
 
   **Optional:** Start server from anywhere:
 
-  ```
+  ```bash
   python3 -m http.server 8082 --directory ~/ros2_ws/src/bin_picking_mockup/hmi
   ```
 
 ---
 
-- ### Terminals Needed
-- ROS2 nodes (`ros2 launch ...`)
-- Robot Adapter (`uvicorn ...`)
-- WMS API (`uvicorn ...`)
-- HMI (`python3 -m http.server 8082`)
+## Usage (Docker)
 
-  >
+To run the Bin Picking Mockup using Docker, ensure you have **Docker v2** installed and configured as a non-root user. Installation instructions:
 
-  ⚠️ Make sure to **source the ROS2 workspace in each terminal** before running any service.
+- [Docker Desktop / Engine](https://docs.docker.com/get-docker/)
+- [Manage Docker as a non-root user](https://docs.docker.com/engine/install/linux-postinstall/)
+
+> The user is assumed to be already logged into the Docker registry.
+
+---
+
+### Steps
+
+- Navigate to the root folder of the repository containing `docker-compose.yaml` and `.env`:
+
+```bash
+cd ~/ros2_ws/src/bin_picking_mockup
+```
+
+- Run the containers using Docker Compose:
+
+```bash
+docker compose -p task up -d
+```
+
+>
+
+The -p task prefix is optional and can be replaced with any project name.
+
+Alternatively, for explicit .env usage:
+
+```bash
+docker compose -f docker-compose.yaml --env-file .env -p task up -d
+```
+
+## Verifying Docker Setup
+
+After running Docker Compose, you should see containers created and started. Example output:
+
+```bash
+✔ Container task-wms-api-1 Started
+✔ Container task-reverse-proxy-1 Started
+✔ Container task-bin-picking-mockup-1 Started
+✔ Container task-hmi-1 Started
+✔ Container task-robot-api-1 Started
+```
+
+#### Notes
+
+- **task-wms-api-1** – WMS API service
+- **task-reverse-proxy-1** – Reverse proxy for routing requests
+- **task-bin-picking-mockup-1** – ROS2 bin picking mockup nodes
+- **task-hmi-1** – HMI service
+- **task-robot-api-1** – Robot Adapter API
