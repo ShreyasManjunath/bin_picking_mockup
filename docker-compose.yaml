@@ -8,6 +8,20 @@ x-common-variables: &common-variables
 
 
 services:
+  reverse-proxy:
+    image: traefik:3.4.3
+    command:
+      - --api.dashboard=false
+      - --providers.docker
+      - --global.sendanonymoususage=false
+      - --log.level=ERROR
+      - --entrypoints.web.address=:80
+    ports:
+      - "${HMI_PORT}:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+    environment:
+      HMI_PORT: ${HMI_PORT}
   bin-picking-mockup:
     image: bin-picking-mockup:latest
     command: /bin/bash -c "ros2 launch bin_picking_mockup bin_picking_mockup.launch.py"
@@ -30,4 +44,9 @@ services:
   hmi:
     image: bin-picking-mockup:latest
     command: /bin/bash -c "nginx && tail -f /var/log/nginx/*.log"
-    network_mode: host
+    # network_mode: host
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hmi.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.hmi.entrypoints=web"
+      - "traefik.http.services.hmi.loadbalancer.server.port=80"
