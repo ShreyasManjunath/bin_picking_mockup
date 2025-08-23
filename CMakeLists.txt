@@ -69,9 +69,14 @@ ament_target_dependencies(${PROJECT_NAME}_node
 )
 
 install(DIRECTORY include/
-  DESTINATION include
+  DESTINATION include/${PROJECT_NAME}
 )
 install(DIRECTORY srv
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
 )
 

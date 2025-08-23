@@ -27,11 +27,9 @@ app = FastAPI(
     version="1.0.0",
     swagger_ui_parameters={"defaultModelsExpandDepth": 0, "tryItOutEnabled": True},
 )
-ALLOW_ORIGINS = os.getenv("ALLOW_ORIGINS", "http://localhost:8082").split(",")
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in ALLOW_ORIGINS if o.strip()],
+    allow_origins=["*"],
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )

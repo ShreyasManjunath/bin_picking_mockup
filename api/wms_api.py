@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, StrictInt
 
 ROBOT_BASE_URL = os.getenv("ROBOT_BASE_URL")
 CONFIRM_PICK_URL = f"{ROBOT_BASE_URL}/confirmPick" if ROBOT_BASE_URL else None
-ALLOW_ORIGINS = os.getenv("ALLOW_ORIGINS", "http://localhost:8082").split(",")
+# ALLOW_ORIGINS = os.getenv("ALLOW_ORIGINS", "http://localhost:80").split(",")
 
 app = FastAPI(
     title="WMS API",
@@ -29,7 +29,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in ALLOW_ORIGINS if o.strip()],
+    allow_origins=["*"],
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
