@@ -9,10 +9,7 @@
 namespace bin_picking_mockup {
 
 BinPickServer::BinPickServer()
-    : Node("fake_bin_picking_node"),
-      estop_pressed(false),
-      door_closed(true),
-      barcode(000) {
+    : Node("fake_bin_picking_node"), estop_pressed(false), door_closed(true) {
   estop_sub_ = create_subscription<std_msgs::msg::Bool>(
       "/estop_pressed", 10, [this](std_msgs::msg::Bool::SharedPtr msg) {
         estop_pressed = msg->data;
@@ -22,9 +19,8 @@ BinPickServer::BinPickServer()
       "/door_closed", 10,
       [this](std_msgs::msg::Bool::SharedPtr msg) { door_closed = msg->data; });
 
-  barcode_sub_ = create_subscription<std_msgs::msg::Int32>(
-      "/barcode", 10,
-      [this](std_msgs::msg::Int32::SharedPtr msg) { barcode = msg->data; });
+  barcode_client_ =
+      this->create_client<bin_picking_mockup::srv::GetBarcode>("/get_barcode");
 
   action_server_ = rclcpp_action::create_server<FakeBinPick>(
       this, "fake_bin_pick",
@@ -67,7 +63,7 @@ auto BinPickServer::handle_accepted(
         auto result = std::make_shared<FakeBinPick::Result>();
         result->success = false;
         result->message = "Canceled";
-        result->barcode = barcode;
+        result->barcode = get_barcode_from_service();
         goal_handle->canceled(result);
         return;
       }
@@ -90,9 +86,28 @@ auto BinPickServer::handle_accepted(
     auto result = std::make_shared<FakeBinPick::Result>();
     result->success = true;
     result->message = "Pick Successful";
-    result->barcode = barcode;
+    result->barcode = get_barcode_from_service();
     goal_handle->succeed(result);
   }).detach();
+}
+
+auto BinPickServer::get_barcode_from_service() -> int {
+  auto request =
+      std::make_shared<bin_picking_mockup::srv::GetBarcode::Request>();
+
+  if (!barcode_client_->wait_for_service(std::chrono::seconds(2))) {
+    RCLCPP_ERROR(this->get_logger(), "Barcode service not available");
+    return 0;  // fallback
+  }
+
+  auto future = barcode_client_->async_send_request(request);
+  if (future.wait_for(std::chrono::seconds(2)) == std::future_status::ready) {
+    return future.get()->barcode;
+  } else {
+    RCLCPP_ERROR(this->get_logger(),
+                 "Timeout waiting for /get_barcode service");
+    return 0;
+  }
 }
 
 }  // namespace bin_picking_mockup
