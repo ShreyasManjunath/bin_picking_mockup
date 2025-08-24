@@ -9,6 +9,7 @@
 #include <string>
 
 #include "bin_picking_mockup/action/fake_bin_pick.hpp"
+#include "bin_picking_mockup/srv/get_barcode.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "std_msgs/msg/bool.hpp"
@@ -26,11 +27,11 @@ class BinPickServer : public rclcpp::Node {
  private:
   bool estop_pressed;
   bool door_closed;
-  int32_t barcode;
 
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr estop_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr door_sub_;
-  rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr barcode_sub_;
+  rclcpp::Client<bin_picking_mockup::srv::GetBarcode>::SharedPtr
+      barcode_client_;
 
   rclcpp_action::Server<FakeBinPick>::SharedPtr action_server_;
 
@@ -45,5 +46,6 @@ class BinPickServer : public rclcpp::Node {
   auto handle_accepted(
       const std::shared_ptr<rclcpp_action::ServerGoalHandle<FakeBinPick>>
           goal_handle) -> void;
+  auto get_barcode_from_service() -> int;
 };
 }  // namespace bin_picking_mockup
