@@ -1,0 +1,52 @@
+version: '4.4'
+
+x-common-variables: &common-variables
+  CYCLONEDDS_URI: <CycloneDDS><Domain><Discovery><MaxAutoParticipantIndex>1000</MaxAutoParticipantIndex></Discovery><General><Interfaces><NetworkInterface
+    name="lo" multicast="true"/></Interfaces></General></Domain></CycloneDDS>
+  RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+  ROS_DOMAIN_ID: '0'
+
+
+services:
+  reverse-proxy:
+    image: traefik:3.4.3
+    command:
+      - --api.dashboard=false
+      - --providers.docker
+      - --global.sendanonymoususage=false
+      - --log.level=ERROR
+      - --entrypoints.web.address=:80
+    ports:
+      - "${HMI_PORT}:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+    environment:
+      HMI_PORT: ${HMI_PORT}
+  bin-picking-mockup:
+    image: shreyasmanjunath/bin-picking-mockup-humble:latest
+    command: /bin/bash -c "ros2 launch bin_picking_mockup bin_picking_mockup.launch.py"
+    network_mode: host
+    environment: *common-variables
+
+  robot-api:
+    image: shreyasmanjunath/bin-picking-mockup:latest
+    command: python3 -m uvicorn robot_adapter:app --host 0.0.0.0 --port 8081
+    network_mode: host
+    environment: *common-variables
+
+  wms-api:
+    image: shreyasmanjunath/bin-picking-mockup:latest
+    command: python3 -m uvicorn wms_api:app --host 0.0.0.0 --port 8080
+    network_mode: host
+    environment:
+      <<: *common-variables
+      ROBOT_BASE_URL: ${ROBOT_BASE_URL}
+  hmi:
+    image: shreyasmanjunath/bin-picking-mockup:latest
+    command: /bin/bash -c "nginx && tail -f /var/log/nginx/*.log"
+    # network_mode: host
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hmi.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.hmi.entrypoints=web"
+      - "traefik.http.services.hmi.loadbalancer.server.port=80"
