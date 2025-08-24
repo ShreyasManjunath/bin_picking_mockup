@@ -609,7 +609,14 @@ docker-compose -f docker-compose-humble.yaml -p task up -d
 
 - The HMI port is configurable via the .env file. By default, for Docker setup, it runs on port 1000. You can change this by setting a different value in .env before starting the container.
 
----
+## Improvements
+
+- Enable SSL/TLS: Secure communication for both the WMS API and Robot Adapter API.
+
+- Asynchronous Pick Requests: Convert the /pick endpoint to async to improve performance and avoid blocking while waiting for /confirmPick responses.
+
+- Auto-routing with Traefik: Use Traefik for dynamic API routing, allowing easier service discovery and load balancing for multiple endpoints.
+
 ## References and Acknowledgements
 
 - ROS2 Jazzy docs: [Jazzy](https://docs.ros.org/en/jazzy/index.html)
