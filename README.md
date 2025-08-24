@@ -1,5 +1,46 @@
 # Bin Picking Mockup
 
+### Index
+
+- [Overview](#overview)
+- [ROS2 Package](#ros2-package)
+  - [barcode_publisher](#barcode_publisher)
+  - [door_state_handler](#door_state_handler)
+  - [estop_handler](#estop_handler)
+  - [stack_light_handler](#stack_light_handler)
+  - [fake_bin_picking_node (Action Server)](#fake_bin_picking_node-action-server)
+  - [Uses Executors](#uses-executors)
+- [API Layer](#api-layer)
+  - [Robot Adapter API](#robot-adapter-api)
+    - [E-Stop](#estop)
+    - [Door](#door)
+    - [Stack Light](#stack-light)
+    - [Fake Bin Picking](#fake-bin-picking)
+    - [Swagger UI](#swagger-ui)
+  - [WMS API](#wms-api)
+    - [Pick Endpoint](#main-pick-endpoint)
+    - [Robot Status](#robot-status)
+    - [Traffic Monitoring](#traffic-monitoring)
+    - [Health](#health)
+    - [Notes](#notes)
+- [HMI](#hmi-human-machine-interface)
+- [Installation](#installation)
+  - [Prerequisites](#prerequisites)
+  - [Option 1: Clone via GitHub](#option-1-clone-via-github)
+  - [Option 2: Download ZIP file](#option-2-download-zip-file)
+  - [Build ROS2 Workspace](#build-ros2-workspace)
+  - [API Environment Setup](#api-environment-setup)
+- [Usage (Local Setup)](#usage-local-setup)
+- [Usage (Docker)](#usage-docker)
+  - [Verifying Docker Setup](#verifying-docker-setup)
+  - [Accessing the Application](#accessing-the-application)
+    - [HMI](#hmi)
+    - [Robot Adapter API (Swagger UI)](#robot-adapter-api-swagger-ui)
+    - [WMS API (Swagger UI)](#wms-api-swagger-ui)
+- [Compatibility](#compatibility)
+- [Improvements](#improvements)
+- [References and Acknowledgements](#references-and-acknowledgements)
+
 ## Overview
 
 The **Bin Picking Mockup** is a ROS2-based package designed to simulate a bin picking task environment. It integrates Human-Machine Interface (HMI), ROS2 nodes, and REST APIs to provide a complete mockup system for testing and prototyping.
@@ -500,6 +541,15 @@ To run the Bin Picking Mockup using Docker, ensure you have **Docker v2** instal
 cd ~/ros2_ws/src/bin_picking_mockup
 ```
 
+or
+
+- Clone the repo again to your desired directory.
+
+```bash
+git clone https://github.com/ShreyasManjunath/bin_picking_mockup.git
+cd /path/to/bin_picking_mockup
+```
+
 - Pull the docker images
 
 ```bash
@@ -518,9 +568,7 @@ docker compose -f docker-compose.yaml pull
 docker compose -p task up -d
 ```
 
->
-
-The -p task prefix is optional and can be replaced with any project name.
+> The -p task prefix is optional and can be replaced with any project name.
 
 Alternatively, for explicit .env usage:
 
@@ -567,6 +615,20 @@ Once everything is running, you can open the following in your browser to intera
 
 ![HMI Screenshot](docs/images/hmi.png)
 
+- To trigger a pick task, visit WMS API swagger ui at [http://localhost:8080/docs](http://localhost:8080/docs) to use the /pick endpoint. Ref: [WMS API (Swagger UI)](#wms-api-swagger-ui).
+
+- If you want to use curl, use the following command. Change the pickId and quantity accordingly.
+
+```bash
+curl -X 'POST' \
+  'http://localhost:8080/pick' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "pickId": 123,
+  "quantity": 4
+}'
+```
 
 ### Robot Adapter API (Swagger UI)
 - **URL (both Local & Docker):** [http://localhost:8081/docs](http://localhost:8081/docs)
