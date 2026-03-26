@@ -1,24 +1,23 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from threading import Thread
+from threading import Event, Thread
 from typing import Optional, Any, Dict
 
-import os
 import rclpy
+from fastapi import FastAPI, HTTPException, Path
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 from rclpy.node import Node
 from rclpy.action import ActionClient
-
-from fastapi import FastAPI, Path
-from pydantic import BaseModel, Field
-import uvicorn
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.task import Future
 
 from std_msgs.msg import Int32, Bool
 from bin_picking_mockup.srv import SetEStopState, SetDoorState
 from bin_picking_mockup.action import (
     FakeBinPick,
 )
-from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI(
@@ -81,11 +80,17 @@ class ApiNode(Node):
                 self.get_logger().info(f"Waiting for {name} service...")
 
         self.stack_light_state: Optional[int] = None
-        self.create_subscription(Int32, "/stack_light", self.light_callback, 10)
+        self.stack_light_sub = self.create_subscription(
+            Int32, "/stack_light", self.light_callback, 10
+        )
         self.estop_pressed: Optional[bool] = False
-        self.create_subscription(Bool, "/estop_pressed", self.estop_callback, 10)
+        self.estop_sub = self.create_subscription(
+            Bool, "/estop_pressed", self.estop_callback, 10
+        )
         self.door_closed: Optional[bool] = True
-        self.create_subscription(Bool, "/door_closed", self.door_callback, 10)
+        self.door_sub = self.create_subscription(
+            Bool, "/door_closed", self.door_callback, 10
+        )
 
         self.pick_action = ActionClient(self, FakeBinPick, "/fake_bin_pick")
         while not self.pick_action.wait_for_server(timeout_sec=1.0):
@@ -100,19 +105,50 @@ class ApiNode(Node):
     def door_callback(self, msg: Bool):
         self.door_closed = bool(msg.data)
 
+    def _wait_for_future(
+        self,
+        future: Future,
+        *,
+        timeout_sec: float,
+        description: str,
+    ) -> Any:
+        done = Event()
+        result: Dict[str, Any] = {"value": None, "error": None}
+
+        def on_complete(completed_future: Future) -> None:
+            try:
+                result["value"] = completed_future.result()
+            except Exception as exc:  # pragma: no cover - defensive bridge
+                result["error"] = exc
+            finally:
+                done.set()
+
+        future.add_done_callback(on_complete)
+        if not done.wait(timeout=timeout_sec):
+            raise TimeoutError(f"Timed out waiting for {description}.")
+        if result["error"] is not None:
+            raise RuntimeError(f"{description} failed.") from result["error"]
+        return result["value"]
+
     def call_estop(self, pressed: bool):
         req = SetEStopState.Request()
         req.pressed = bool(pressed)
         fut = self.cli_estop.call_async(req)
-        rclpy.spin_until_future_complete(self, fut)
-        return fut.result()
+        return self._wait_for_future(
+            fut,
+            timeout_sec=5.0,
+            description="/set_estop_state service call",
+        )
 
     def call_door(self, closed: bool):
         req = SetDoorState.Request()
         req.closed = bool(closed)
         fut = self.cli_door.call_async(req)
-        rclpy.spin_until_future_complete(self, fut)
-        return fut.result()
+        return self._wait_for_future(
+            fut,
+            timeout_sec=5.0,
+            description="/set_door_state service call",
+        )
 
     def run_pick_sync(self, pick_id: int) -> PickSyncResponse:
         """
@@ -122,10 +158,12 @@ class ApiNode(Node):
         goal = FakeBinPick.Goal()
         goal.task_id = int(pick_id)
 
-        # Send goal
         send_future = self.pick_action.send_goal_async(goal)
-        rclpy.spin_until_future_complete(self, send_future)
-        goal_handle = send_future.result()
+        goal_handle = self._wait_for_future(
+            send_future,
+            timeout_sec=10.0,
+            description="/fake_bin_pick goal submission",
+        )
 
         if goal_handle is None or not goal_handle.accepted:
             error_msg = "Goal rejected by action server."
@@ -141,8 +179,11 @@ class ApiNode(Node):
             )
 
         result_future = goal_handle.get_result_async()
-        rclpy.spin_until_future_complete(self, result_future)
-        result_obj = result_future.result()
+        result_obj = self._wait_for_future(
+            result_future,
+            timeout_sec=15.0,
+            description="/fake_bin_pick result",
+        )
         result_msg = getattr(result_obj, "result", None)
 
         if result_msg is None:
@@ -166,24 +207,37 @@ class ApiNode(Node):
         )
 
 
-def _spin(node: Node):
-    rclpy.spin(node)
+def _spin(executor: MultiThreadedExecutor) -> None:
+    executor.spin()
+
+
+def _raise_api_error(exc: Exception) -> None:
+    if isinstance(exc, TimeoutError):
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
+    raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     rclpy.init()
     node = ApiNode()
-    spin_thread = Thread(target=_spin, args=(node,), daemon=True)
+    executor = MultiThreadedExecutor(num_threads=2)
+    executor.add_node(node)
+    spin_thread = Thread(target=_spin, args=(executor,), daemon=True)
     spin_thread.start()
 
     app.state.ros_node = node
+    app.state.ros_executor = executor
+    app.state.spin_thread = spin_thread
     try:
         yield
     finally:
         node.get_logger().info("Shutting down ROS2...")
+        executor.remove_node(node)
+        executor.shutdown(timeout_sec=1.0)
         node.destroy_node()
         rclpy.shutdown()
+        spin_thread.join(timeout=2.0)
 
 
 app.router.lifespan_context = lifespan
@@ -199,7 +253,10 @@ app.router.lifespan_context = lifespan
 def trigger_estop(
     pressed: bool = Path(..., description="`true` to press E-Stop, `false` to release.")
 ):
-    res = app.state.ros_node.call_estop(pressed)
+    try:
+        res = app.state.ros_node.call_estop(pressed)
+    except Exception as exc:
+        _raise_api_error(exc)
     return {
         "success": bool(getattr(res, "success", True)),
         "message": getattr(res, "message", ""),
@@ -216,7 +273,10 @@ def trigger_estop(
 def trigger_door(
     closed: bool = Path(..., description="`true` to close door, `false` to open.")
 ):
-    res = app.state.ros_node.call_door(closed)
+    try:
+        res = app.state.ros_node.call_door(closed)
+    except Exception as exc:
+        _raise_api_error(exc)
     return {
         "success": bool(getattr(res, "success", True)),
         "message": getattr(res, "message", ""),
@@ -293,4 +353,7 @@ def get_door_state():
     ),
 )
 def start_fake_pick(req: PickRequest):
-    return app.state.ros_node.run_pick_sync(req.pickId)
+    try:
+        return app.state.ros_node.run_pick_sync(req.pickId)
+    except Exception as exc:
+        _raise_api_error(exc)
