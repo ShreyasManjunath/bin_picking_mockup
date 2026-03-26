@@ -66,17 +66,8 @@ The ROS2 package simulates the bin picking task environment with the following f
 ### `barcode_publisher`
 
 - **Purpose**:
-  The task specified that the node should *"constantly publish a barcode of 5 random numbers"* on a topic.
-
-- **Ambiguity in Requirement**:
-  The phrase was ambiguous and could mean:
-  1. A single 5-digit number, where each digit is randomly generated.
-  2. A sequence of 5 independent random numbers (each potentially multiple digits).
-
-- **Design Decision**:
-  To keep it simple and realistic to how barcodes are typically represented (a continuous sequence of digits), this node was implemented to **publish a single random 5-digit number**.
+  This node continuously publishes a synthetic barcode value as a 5-digit number.
   - Example output: `48291`
-  - This avoids confusion with variable-length sequences and better reflects a barcode-like identifier.
 
 - **What this node does**:
   - Generates a new random 5-digit number at a fixed interval.
@@ -92,13 +83,8 @@ The ROS2 package simulates the bin picking task environment with the following f
 - **Purpose**:
   This node represents the **state of the safety door** in the bin picking setup. The door can either be *open* or *closed*.
 
-- **Task Requirement**:
-  The task description stated:
-  *"To mock the fact of the door being opened or closed, you can: either kill the node and run it again to change the boolean value it publishes; or you can implement a service that simply switches the current value that is published."*
-
-- **Design Decision**:
-  Instead of restarting the node to toggle the door state (which is cumbersome and unrealistic in a real system), the chosen approach was to **implement a service** that allows controlling the door state at runtime.
-  - This more accurately simulates how an HMI or automation system might control a safety door.
+- **Implementation**:
+  The node exposes a **service** for updating door state at runtime, which is a practical interface for HMI and integration testing.
 
 - **What this node does**:
   - Publishes a boolean state indicating whether the door is closed.
@@ -115,12 +101,8 @@ The ROS2 package simulates the bin picking task environment with the following f
 - **Purpose**:
   This node represents the **emergency stop button** in the bin picking setup. The button can either be *pressed* or *released*.
 
-- **Task Requirement**:
-  The task description stated:
-  *"To mock the fact of the button being pressed, implement one service that changes the state of the button to true (which mimics the button being pressed), and another service to reset the button back to false, as if the button has been released. Also, publish a topic to show the state."*
-
-- **Design Decision**:
-  Instead of simulating a press manually or restarting the node, a service was implemented:
+- **Implementation**:
+  The node exposes a service interface:
   - **`set_estop_state`** → sets the button state to `true` (pressed) or `false` (released).
   - The node continuously publishes the state on a topic, providing real-time feedback.
   This mirrors how an actual safety system could be tested programmatically and monitored.
@@ -140,8 +122,8 @@ The ROS2 package simulates the bin picking task environment with the following f
 - **Purpose**:
   This node simulates the **stack light** in the bin picking setup, which indicates the system status using different colors or states.
 
-- **Task Requirement**:
-  The task requires publishing the stack light state based on system conditions:
+- **Behavior**:
+  The node publishes stack light state based on system conditions:
   - `0` → operational (green)
   - `1` → pause (yellow, e.g., door open)
   - `-1` → E-stop pressed (red)
@@ -269,7 +251,7 @@ The API layer provides REST endpoints and ROS2 adapters for external system inte
 ```
 
 - `pickId` is used as the action goal.
-- `quantity` is ignored because the task did not provide clear instructions for handling multiple items.
+- `quantity` is currently ignored; the endpoint processes a single simulated pick per request.
 - **Response**:
 
   ```json
@@ -311,7 +293,7 @@ The API layer provides REST endpoints and ROS2 adapters for external system inte
   }
   ```
   - `pickId` → task identifier
-  - `quantity` → accepted but ignored (no clear instructions in the task)
+  - `quantity` → accepted but currently ignored
   - **Response** → mirrors robot adapter `/confirmPick` response:
 
     ```json
@@ -324,7 +306,7 @@ The API layer provides REST endpoints and ROS2 adapters for external system inte
     ```
   - **Decision Behind Implementation**:
 
-    The task specified that WMS should send pick requests to the robot and receive a response once the pick is completed. The instructions were somewhat ambiguous about where the synchronous pick should be executed. Therefore, the following workflow was choses:
+    The implementation uses the following workflow:
   - The WMS API acts as the **server that receives pick requests** (`/pick`) from the WMS system.
   - The Robot Adapter API acts as the **client that actually performs the pick** (faked via `/confirmPick`).
   - `/pick` on the WMS side is synchronous: it waits for the robot adapter to complete the pick and returns the result to the WMS.
